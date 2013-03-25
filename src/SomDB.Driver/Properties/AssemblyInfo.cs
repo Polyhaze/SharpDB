@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("SomDB.Cmd")]
+[assembly: AssemblyTitle("SomDB.Driver")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("SomDB.Cmd")]
+[assembly: AssemblyProduct("SomDB.Driver")]
 [assembly: AssemblyCopyright("Copyright ©  2013")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("5d54d927-aae1-4cb1-a435-9d29ff0ea208")]
+[assembly: Guid("36cb026a-0483-4f7f-b518-ec63db9294d7")]
 
 // Version information for an assembly consists of the following four values:
 //

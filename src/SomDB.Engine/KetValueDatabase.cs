@@ -5,41 +5,49 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SomDB.Engine.Backup;
 using SomDB.Engine.Domain;
 using SomDB.Engine.IO;
+using SomDB.Engine.Cache;
 
 namespace SomDB.Engine
 {
-	public class DB
+	public class KetValueDatabase
 	{
+		private readonly byte[] ZeroBlob = new byte[0];
+
+		private readonly Func<string, IDatabaseReader> m_readerFactory;
+		private readonly Func<string, IDatabaseWriter> m_writerFactory;
+		private readonly Func<string, ICacheProvider> m_cacheProviderFactory;
+
 		private DocumentStore m_documentStore;
 
-		private DatabaseFileWriter m_databaseFileWriter;
-		private DatabaseFileReader m_databaseFileReader;
-
-		private Cache m_cache;
+		private IDatabaseWriter m_databaseFileWriter;
+		private IDatabaseReader m_databaseFileReader;
+		private ICacheProvider m_cacheProvider;
 
 		private int m_currentTransactionId = 1;
 
 		Dictionary<int, Transaction> m_pendingTransaction = new Dictionary<int, Transaction>();
 		
-		public DB(string fileName)
+		public KetValueDatabase(Func<string, IDatabaseReader> readerFactory, 
+			Func<string, IDatabaseWriter> writerFactory, Func<string, ICacheProvider> cacheProviderFactory)
 		{
-			FileName = fileName;
-
+			FileName = "default.dbfile";
+			m_readerFactory = readerFactory;
+			m_writerFactory = writerFactory;
+			m_cacheProviderFactory = cacheProviderFactory;
 		}
 
 		public ulong DBTimeStamp { get; private set; }
 
-		public string FileName { get; private set; }
+		public string FileName { get;  set; }
 
 		public void Start()
 		{
-			m_databaseFileWriter = new DatabaseFileWriter(FileName);
-			m_databaseFileReader = new DatabaseFileReader(FileName);
+			m_databaseFileWriter = m_writerFactory(FileName);
+			m_databaseFileReader = m_readerFactory(FileName);
 
-			m_cache = new Cache(FileName);
+			m_cacheProvider = m_cacheProviderFactory(FileName);
 
 			ulong timestamp;
 
@@ -48,7 +56,7 @@ namespace SomDB.Engine
 			DBTimeStamp = timestamp;
 		}
 
-		public void Store(string documentId, byte[] blob)
+		public void Update(DocumentId documentId, byte[] blob)
 		{
 			Document document = m_documentStore.GetDocumentForUpdate(documentId, -1);
 
@@ -57,7 +65,11 @@ namespace SomDB.Engine
 			m_databaseFileWriter.BeginTimestamp(DBTimeStamp, 1);
 
 			long documentLocation = m_databaseFileWriter.WriteDocument(documentId, blob);
-			m_cache.Set(documentLocation, blob);
+
+			if (blob.Length > 0)
+			{
+				m_cacheProvider.Set(documentLocation, blob);
+			}
 
 			m_databaseFileWriter.Flush();
 
@@ -71,7 +83,7 @@ namespace SomDB.Engine
 			}
 		}
 
-		public byte[] Read(string key)
+		public byte[] Get(DocumentId key)
 		{
 			Document document = m_documentStore.GetDocument(key);
 
@@ -85,17 +97,30 @@ namespace SomDB.Engine
 			}
 		}
 
+		public void Delete(DocumentId documentId)
+		{
+			Update(documentId, ZeroBlob);
+		}
+
+
 		private byte[] ReadInternal(long fileLocation, int size)
 		{
-			byte[] blob = m_cache.Get(fileLocation);
-
-			if (blob == null)
+			if (size > 0)
 			{
-				blob = m_databaseFileReader.ReadDocument(fileLocation, size);
-				m_cache.Set(fileLocation, blob);
-			}
+				byte[] blob = m_cacheProvider.Get(fileLocation);
 
-			return blob;
+				if (blob == null)
+				{
+					blob = m_databaseFileReader.ReadDocument(fileLocation, size);
+					m_cacheProvider.Set(fileLocation, blob);
+				}
+
+				return blob;
+			}
+			else
+			{
+				return ZeroBlob;
+			}
 		}
 
 		public int StartTransaction()
@@ -108,7 +133,7 @@ namespace SomDB.Engine
 			return transaction.TransactionId;
 		}
 
-		public void TransactionUpdate(int transactionId, string documentId, byte[] blob)
+		public void TransactionUpdate(int transactionId, DocumentId documentId, byte[] blob)
 		{
 			Transaction transaction;
 
@@ -123,7 +148,12 @@ namespace SomDB.Engine
 			transaction.AddUpdate(documentId, blob);
 		}
 
-		public byte[] TransactionRead(int transactionId, string documentId)
+		public void TransactionDelete(int transactionId, DocumentId documentId)
+		{
+			TransactionUpdate(transactionId, documentId, ZeroBlob);
+		}
+
+		public byte[] TransactionGet(int transactionId, DocumentId documentId)
 		{
 			Transaction transaction;
 
@@ -165,7 +195,7 @@ namespace SomDB.Engine
 				throw new TransactionNotExistException();
 			}
 
-			foreach (string documentId in transaction.GetDocumentIds())
+			foreach (DocumentId documentId in transaction.GetDocumentIds())
 			{
 				Document document = m_documentStore.GetDocument(documentId);
 				document.RollbackTransaction();
@@ -189,12 +219,17 @@ namespace SomDB.Engine
 
 				m_databaseFileWriter.BeginTimestamp(DBTimeStamp, transaction.Count);
 
-				foreach (string documentId in transaction.GetDocumentIds())
+				foreach (DocumentId documentId in transaction.GetDocumentIds())
 				{
 					byte[] blob = transaction.GetBlob(documentId);
 
 					long documentLocation = m_databaseFileWriter.WriteDocument(documentId, blob);
-					m_cache.Set(documentLocation, blob);
+
+					// we don't store deleted objects in the cache
+					if (blob.Length > 0)
+					{
+						m_cacheProvider.Set(documentLocation, blob);
+					}
 
 					Document document = m_documentStore.GetDocument(documentId);
 
@@ -204,7 +239,11 @@ namespace SomDB.Engine
 					}
 					else
 					{
-						m_documentStore.AddNewDocument(documentId, DBTimeStamp, documentLocation, blob.Length);
+						// only add the new document if the document is not deleted
+						if (blob.Length > 0)
+						{
+							m_documentStore.AddNewDocument(documentId, DBTimeStamp, documentLocation, blob.Length);
+						}
 					}
 				}
 
@@ -225,14 +264,7 @@ namespace SomDB.Engine
 				
 			m_documentStore.Cleanup(minTimestamp);
 		}
-
-		public Task BackupAsync(string destinationFilename)
-		{
-			FullBackup backupProcess = new FullBackup(m_documentStore.GetAllDocumentsLatestRevision(), FileName, destinationFilename);
-
-			return Task.Factory.StartNew(backupProcess.Start);
-		}
-			
+		
 		public void Stop()
 		{
 			m_databaseFileWriter.Dispose();

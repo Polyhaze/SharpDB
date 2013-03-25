@@ -7,14 +7,14 @@ namespace SomDB.Engine.Domain
 {
 	public class DocumentStore
 	{
-		Dictionary<string, Document> m_documents;
+		Dictionary<DocumentId, Document> m_documents;
 
-		public DocumentStore(Dictionary<string, Document> documents)
+		public DocumentStore(Dictionary<DocumentId, Document> documents)
 		{
 			m_documents = documents;
 		}
 
-		public Document GetDocumentForUpdate(string documentId, int transactionId)
+		public Document GetDocumentForUpdate(DocumentId documentId, int transactionId)
 		{
 			Document document;
 
@@ -30,23 +30,23 @@ namespace SomDB.Engine.Domain
 			return document;
 		}
 
-		public Document GetDocument(string documentId)
+		public Document GetDocument(DocumentId documentId)
 		{
 			Document document;
 
 			m_documents.TryGetValue(documentId, out document);
 
 			return document;
-		}		
+		}
 
-		public void AddNewDocument(string documentId, ulong documentTimeStamp, long blobFileLocation, int blobSize)
+		public void AddNewDocument(DocumentId documentId, ulong documentTimeStamp, long blobFileLocation, int blobSize)
 		{
 			m_documents.Add(documentId, new Document(documentId, documentTimeStamp, blobFileLocation, blobSize));
 		}
 
 		public void Cleanup(ulong timestamp)
 		{
-			foreach (KeyValuePair<string, Document> keyValuePair in m_documents)
+			foreach (KeyValuePair<DocumentId, Document> keyValuePair in m_documents)
 			{
 				keyValuePair.Value.Cleanup(timestamp);
 			}

@@ -4,23 +4,23 @@ using System.Linq;
 using System.Runtime.Caching;
 using System.Text;
 
-namespace SomDB.Engine
+namespace SomDB.Engine.Cache
 {
-	public class Cache
+	public class MemoryCacheProvider : ICacheProvider
 	{
 		private MemoryCache m_memoryCache;
 		private CacheItemPolicy m_policy;
 
-		public Cache(string filename)
+		public MemoryCacheProvider(string name)
 		{
-			Filename = filename;
-			m_memoryCache = new MemoryCache(Filename);			
+			Name = name;
+			m_memoryCache = new MemoryCache(Name);			
 		
 			m_policy = new CacheItemPolicy();
 			m_policy.SlidingExpiration = TimeSpan.FromHours(1);
 		}
 
-		public string Filename { get; set; }
+		public string Name { get; set; }
 
 		public void Set(long fileLocation, byte[] blob)
 		{
@@ -42,12 +42,6 @@ namespace SomDB.Engine
 			string key = ConvertLongToString(fileLocation);
 
 			return (byte[])m_memoryCache.Get(key);
-		}
-
-		public void Clear()
-		{
-			m_memoryCache.Dispose();
-			m_memoryCache = new MemoryCache(Filename);
-		}
+		}		
 	}
 }

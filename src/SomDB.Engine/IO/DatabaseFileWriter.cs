@@ -1,13 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.Text;
+using SomDB.Engine.Domain;
 
 namespace SomDB.Engine.IO
 {
-	public class DatabaseFileWriter : IDisposable
+	public class DatabaseFileWriter : IDatabaseWriter
 	{
-		private FileStream m_writerStream;
-		
+		private FileStream m_writerStream;		
 
 		private byte[] m_writeDocumentBuffer;
 
@@ -33,23 +33,26 @@ namespace SomDB.Engine.IO
 
 		public string FileName { get; private set; }
 
-		public long WriteDocument(string objectId, byte[] blob)
+		public long WriteDocument(DocumentId documentId, byte[] blob)
 		{
 			// calculate the size of the document including meta data
-			int size = 2 + objectId.Length + 4 + blob.Length;
+			int size = 2 + documentId.Length + 4 + blob.Length;
 
 			int position = 0;
 
-			Buffer.BlockCopy(BitConverter.GetBytes((UInt16)objectId.Length), 0, m_writeDocumentBuffer, position, 2);
+			Buffer.BlockCopy(BitConverter.GetBytes((UInt16)documentId.Length), 0, m_writeDocumentBuffer, position, 2);
 			position += 2;
 
-			Buffer.BlockCopy(Encoding.ASCII.GetBytes(objectId), 0, m_writeDocumentBuffer, position, objectId.Length);
-			position += objectId.Length;
+			Buffer.BlockCopy(documentId.Bytes, 0, m_writeDocumentBuffer, position, documentId.Length);
+			position += documentId.Length;
 
 			Buffer.BlockCopy(BitConverter.GetBytes(blob.Length), 0, m_writeDocumentBuffer, position, 4);
 			position += 4;
 
-			Buffer.BlockCopy(blob, 0, m_writeDocumentBuffer, position, blob.Length);
+			if (blob.Length > 0)
+			{
+				Buffer.BlockCopy(blob, 0, m_writeDocumentBuffer, position, blob.Length);
+			}
 
 			m_writerStream.Write(m_writeDocumentBuffer, 0, size);
 

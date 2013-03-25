@@ -48,13 +48,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Backup\FullBackup.cs" />
-    <Compile Include="Backup\IncrementalBackup.cs" />
-    <Compile Include="Cache.cs" />
+    <Compile Include="Cache\MemoryCacheProvider.cs" />
+    <Compile Include="Cache\ICacheProvider.cs" />
+    <Compile Include="Domain\DocumentKey.cs" />
     <Compile Include="Domain\DocumentStore.cs" />
     <Compile Include="IO\DatabaseFileReader.cs" />
     <Compile Include="IO\DatabaseFileWriter.cs" />
-    <Compile Include="DB.cs" />
+    <Compile Include="IO\IDatabaseReader.cs" />
+    <Compile Include="IO\IDatabaseWriter.cs" />
+    <Compile Include="KetValueDatabase.cs" />
     <Compile Include="Domain\Document.cs" />
     <Compile Include="Domain\DocumentRevision.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

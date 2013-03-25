@@ -6,7 +6,7 @@ using SomDB.Engine.Domain;
 
 namespace SomDB.Engine.IO
 {
-	public class DatabaseFileReader : IDisposable
+	public class DatabaseFileReader : IDatabaseReader
 	{
 		private FileStream m_readStream;
 
@@ -19,16 +19,16 @@ namespace SomDB.Engine.IO
 
 		public string FileName { get; private set; }
 
-		public Dictionary<string, Document> GetDocuments(out ulong dbTimestamp)
+		public Dictionary<DocumentId, Document> GetDocuments(out ulong dbTimestamp)
 		{
 			dbTimestamp = 0;
 
-			Dictionary<string, Document> documents = new Dictionary<string, Document>();
+			Dictionary<DocumentId, Document> documents = new Dictionary<DocumentId, Document>();
 
 			// initialize the buffers
 			byte[] timestampBuffer = new byte[12];
-			byte[] objectIdLengthBuffer = new byte[2];
-			byte[] objectIdBuffer = new byte[UInt16.MaxValue];
+			byte[] documentIdLengthBuffer = new byte[2];
+			byte[] documentIdBuffer = new byte[UInt16.MaxValue];
 
 			byte[] blobLengthBuffer = new byte[4];
 
@@ -49,12 +49,16 @@ namespace SomDB.Engine.IO
 				}
 
 				// first is the object id lenth
-				m_readStream.Read(objectIdLengthBuffer, 0, 2);
-				UInt16 objectIdLength = BitConverter.ToUInt16(objectIdLengthBuffer, 0);
+				m_readStream.Read(documentIdLengthBuffer, 0, 2);
+				UInt16 objectIdLength = BitConverter.ToUInt16(documentIdLengthBuffer, 0);
 
 				// read the objectId
-				m_readStream.Read(objectIdBuffer, 0, objectIdLength);
-				string objectId = Encoding.ASCII.GetString(objectIdBuffer, 0, objectIdLength);
+				m_readStream.Read(documentIdBuffer, 0, objectIdLength);
+				
+				byte[] documentIdBytes = new byte[objectIdLength];
+				Buffer.BlockCopy(documentIdBuffer, 0, documentIdBytes, 0, objectIdLength);
+				
+				DocumentId documentId = new DocumentId(documentIdBytes);
 
 				// read the blob length
 				m_readStream.Read(blobLengthBuffer, 0, 4);
@@ -64,15 +68,24 @@ namespace SomDB.Engine.IO
 				// take the position of the file to the next document
 				m_readStream.Position += blobLength;
 
-				if (!documents.ContainsKey(objectId))
+				// check if the document not exist and not deleted (zero length is deleted 
+				if (!documents.ContainsKey(documentId) && blobLength > 0)
 				{
-					documents.Add(objectId, new Document(objectId, dbTimestamp, blobLocation, blobLength));
+					documents.Add(documentId, new Document(documentId, dbTimestamp, blobLocation, blobLength));
 				}
 				else
 				{
-					Document metaData = documents[objectId];
+					// if the document is deleted we just remove the document from the store
+					if (blobLength == 0)
+					{
+						documents.Remove(documentId);
+					}
+					else
+					{
+						Document document = documents[documentId];
 
-					metaData.Update(dbTimestamp, blobLocation, blobLength, false);
+						document.Update(dbTimestamp, blobLocation, blobLength, false);
+					}
 				}
 
 				documentsCounter++;

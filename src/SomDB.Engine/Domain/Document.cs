@@ -9,14 +9,14 @@ namespace SomDB.Engine.Domain
 		private SortedList<ulong, DocumentRevision> m_revisions = 
 			new SortedList<ulong, DocumentRevision>(new ULongDescendingComparer());
 
-		public Document(string documentId, ulong documentTimeStamp, long blobFileLocation, int blobSize)
+		public Document(DocumentId documentId, ulong documentTimeStamp, long blobFileLocation, int blobSize)
 		{
 			DocumentId = documentId;
 
 			CurrentRevision = new DocumentRevision(documentId,documentTimeStamp, blobFileLocation, blobSize);
 		}
 
-		public string DocumentId { get; private set; }
+		public DocumentId DocumentId { get; private set; }
 
 		public DocumentRevision CurrentRevision { get; private set; }
 		

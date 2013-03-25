@@ -5,44 +5,58 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using SomDB.Engine;
+using System.Threading;
+using NetMQ;
+using Newtonsoft.Json.Linq;
+using SomDB.Driver;
+using SomDB.Driver.Json;
 
 namespace ConsoleApplication1
 {
 	class Program
 	{
-		static void Main(string[] args)		
+		class Account
 		{
-			Stopwatch stopwatch = Stopwatch.StartNew();
+			public Account(int id, string name)
+			{
+				Id = id;
+				Name = name;
+			}
 
-			DB db = new DB("perf.dbfile");
-			db.Start();
+			public int Id { get; set; }
 
-			stopwatch.Stop();
+			public string Name { get; set; }
+		}
 
-			Console.WriteLine("Loading db took {0}ms", stopwatch.ElapsedMilliseconds);
 
-			stopwatch.Restart();
-			
-			db.BackupAsync("backup.dbfile").Wait();
+		static void Main(string[] args)
+		{
+			Thread.Sleep(2000);
 
-			stopwatch.Stop();
+			using (NetMQContext context = NetMQContext.Create())
+			{
+				SomDBClient client = new SomDBClient(context, "tcp://127.0.0.1:5999");
 
-			Console.WriteLine("Backup db took {0}ms", stopwatch.ElapsedMilliseconds);
+				var connection = client.GetConnection();
 
-			stopwatch.Restart();
+				connection.Update(new Account(1, "Doron"));
 
-			DB backup = new DB("backup.dbfile");
-			backup.Start();
+				var jobject = connection.GetJObject(1);
 
-			stopwatch.Stop();
+				JObject obj = new JObject();
 
-			Console.WriteLine("Loading backup db took {0}ms", stopwatch.ElapsedMilliseconds);
+				JValue idValue = new JValue(3);
+				JValue nameValue = new JValue("Yoni");
 
-			byte[] blob = backup.Read("1");
+				obj.Add("Id", idValue);
+				obj.Add("Name", nameValue);
 
-			Console.WriteLine(blob[0]);
+				connection.UpdateJObject(obj);
 
+				var account = connection.Get<Account>(3);
+
+				Console.WriteLine("Id:{0}, Name:{1}", account.Id, account.Name);				
+			}
 			Console.ReadKey();
 		}
 	}

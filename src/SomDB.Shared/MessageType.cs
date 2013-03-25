@@ -7,6 +7,6 @@ namespace SomDB.Shared
 {
 	public enum MessageType : byte
 	{
-		Read, Update, StartTransaction, Commit, Rollback, TransactionRead, TransactionUpdate 
+		Get, Update,Delete, StartTransaction, Commit, Rollback, TransactionGet, TransactionUpdate, TransactionDelete 
 	}
 }

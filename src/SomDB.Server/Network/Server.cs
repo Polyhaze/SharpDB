@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using NetMQ;
 using SomDB.Engine;
+using SomDB.Engine.Domain;
 using SomDB.Shared;
 
 namespace SomDB.Server.Network
@@ -11,12 +12,12 @@ namespace SomDB.Server.Network
 	public class Server
 	{
 		private readonly NetMQContext m_context;
-		private readonly DB m_db;
+		private readonly KetValueDatabase m_db;
 		private readonly int m_port;
 		private NetMQSocket m_serverSocket;
 		private Poller m_poller;
 
-		public Server(NetMQContext context, DB db, int port)
+		public Server(NetMQContext context, KetValueDatabase db, int port)
 		{
 			m_context = context;
 			m_db = db;
@@ -45,12 +46,15 @@ namespace SomDB.Server.Network
 
 			switch (messageType)
 			{
-				case MessageType.Read:
-					Read();
+				case MessageType.Get:
+					Get();
 					break;
 				case MessageType.Update:
 					Update();
 					break;
+				case MessageType.Delete:
+					Delete();
+					break;					
 				case MessageType.StartTransaction:
 					StartTransaction();
 					break;
@@ -60,16 +64,48 @@ namespace SomDB.Server.Network
 				case MessageType.Rollback:
 					Rollback();
 					break;
-				case MessageType.TransactionRead:
-					TransactionRead();					
+				case MessageType.TransactionGet:
+					TransactionGet();					
 					break;
 				case MessageType.TransactionUpdate:
 					TransactionUpdate();
 					break;
+				case MessageType.TransactionDelete:
+					TransactionDelete();
+					break;					
 				default:
 					throw new ArgumentOutOfRangeException();
 			}
 		}
+
+		
+		private void TransactionDelete()
+		{
+			byte[] transactionIdBytes = m_serverSocket.Receive();
+
+			int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
+
+			byte[] documentIdBytes = m_serverSocket.Receive();
+
+			DocumentId documentId = new DocumentId(documentIdBytes);
+			
+			try
+			{
+				m_db.TransactionDelete(transactionId, documentId);
+
+				// sending success
+				m_serverSocket.Send(Protocol.Success);
+			}
+			catch (TransactionNotExistException ex)
+			{
+				m_serverSocket.SendMore(Protocol.Failed).Send("Transaction doesn't exist");
+			}
+			catch (DocumentLockedException)
+			{
+				m_serverSocket.SendMore(Protocol.Failed).Send("Document locked by another transaction");
+			}
+		}
+
 
 		private void TransactionUpdate()
 		{
@@ -79,7 +115,7 @@ namespace SomDB.Server.Network
 
 			byte[] documentIdBytes = m_serverSocket.Receive();
 
-			string documentId = Encoding.ASCII.GetString(documentIdBytes);
+			DocumentId documentId = new DocumentId(documentIdBytes);
 
 			byte[] blob = m_serverSocket.Receive();
 
@@ -100,7 +136,7 @@ namespace SomDB.Server.Network
 			}					
 		}
 
-		private void TransactionRead()
+		private void TransactionGet()
 		{
 			byte[] transactionIdBytes = m_serverSocket.Receive();
 
@@ -108,11 +144,11 @@ namespace SomDB.Server.Network
 
 			byte[] documentIdBytes = m_serverSocket.Receive();
 
-			string documentId = Encoding.ASCII.GetString(documentIdBytes);
+			DocumentId documentId = new DocumentId(documentIdBytes);
 
 			try
 			{
-				byte [] blob = m_db.TransactionRead(transactionId, documentId);
+				byte [] blob = m_db.TransactionGet(transactionId, documentId);
 
 				if (blob == null)
 				{
@@ -172,13 +208,13 @@ namespace SomDB.Server.Network
 		{
 			byte[] documentIdBytes = m_serverSocket.Receive();
 
-			string documentId = Encoding.ASCII.GetString(documentIdBytes);
+			DocumentId documentId = new DocumentId(documentIdBytes);
 
 			byte[] blob = m_serverSocket.Receive();
 
 			try
 			{
-				m_db.Store(documentId, blob);
+				m_db.Update(documentId, blob);
 
 				// sending success
 				m_serverSocket.Send(Protocol.Success);
@@ -189,13 +225,34 @@ namespace SomDB.Server.Network
 			}			
 		}
 
-		private void Read()
+
+		private void Delete()
 		{
 			byte[] documentIdBytes = m_serverSocket.Receive();
 
-			string documentId = Encoding.ASCII.GetString(documentIdBytes);
+			DocumentId documentId = new DocumentId(documentIdBytes);
+			
+			try
+			{
+				m_db.Delete(documentId);
 
-			byte[] blob = m_db.Read(documentId);
+				// sending success
+				m_serverSocket.Send(Protocol.Success);
+			}
+			catch (DocumentLockedException)
+			{
+				m_serverSocket.SendMore(Protocol.Failed).Send("Document locked by another transaction");
+			}
+		}
+
+
+		private void Get()
+		{
+			byte[] documentIdBytes = m_serverSocket.Receive();
+
+			DocumentId documentId = new DocumentId(documentIdBytes);
+
+			byte[] blob = m_db.Get(documentId);
 
 			if (blob == null)
 			{

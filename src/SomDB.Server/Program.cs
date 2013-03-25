@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using SomDB.Engine;
+using SomDB.Engine.IO;
+using SomDB.Engine.Cache;
 
 namespace SomDB.Server
 {
@@ -19,7 +21,9 @@ namespace SomDB.Server
 				port = Convert.ToInt32(args[1]);
 			}
 
-			DB db = new DB(databaseFile);
+			KetValueDatabase db = new KetValueDatabase(filename => new DatabaseFileReader(filename), filename=> new DatabaseFileWriter(filename),
+				filename => new MemoryCacheProvider(filename));
+			db.FileName = databaseFile;
 			db.Start();
 
 			Network.Server server = new Network.Server(NetMQ.NetMQContext.Create(), db, port);

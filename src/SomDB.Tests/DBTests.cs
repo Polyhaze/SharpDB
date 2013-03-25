@@ -5,18 +5,23 @@ using System.Linq;
 using System.Text;
 using NUnit.Framework;
 using SomDB.Engine;
+using SomDB.Engine.Domain;
+using SomDB.Engine.IO;
+using SomDB.Engine.Cache;
 
 namespace SomDB.Tests
 {
 	[TestFixture]
 	public class DBTests
 	{
-		private DB m_db;
+		private KetValueDatabase m_db;
 
 		[SetUp]
 		public void SetUpTest()
 		{
-			m_db = new DB("test.dbfile");
+			m_db = new KetValueDatabase(filename => new DatabaseFileReader(filename), filename=> new DatabaseFileWriter(filename),
+				filename => new MemoryCacheProvider(filename));
+			
 			m_db.Start();
 		}
 
@@ -34,10 +39,12 @@ namespace SomDB.Tests
 		{
 			int transactionId = m_db.StartTransaction();
  
-			// this object is stored out of transaction therefore should be visible for the transaction
-			m_db.Store("1", new byte[1] { 0 });
+			DocumentId id1 = new DocumentId("1");
 
-			byte[] blob = m_db.TransactionRead(transactionId, "1");
+			// this object is stored out of transaction therefore should be visible for the transaction
+			m_db.Update(id1, new byte[1] { 0 });
+
+			byte[] blob = m_db.TransactionGet(transactionId, id1);
 
 			Assert.IsNull(blob);
 
@@ -47,13 +54,15 @@ namespace SomDB.Tests
 		[Test]
 		public void ReadOldRevisionDuringTransaction()
 		{
-			m_db.Store("1", new byte[1] { 0 });
+			DocumentId id1 = new DocumentId("1");
+
+			m_db.Update(id1, new byte[1] { 0 });
 
 			int transactionId = m_db.StartTransaction();
 
-			m_db.Store("1", new byte[1] { 1 });
+			m_db.Update(id1, new byte[1] { 1 });
 
-			byte[] blob = m_db.TransactionRead(transactionId, "1");
+			byte[] blob = m_db.TransactionGet(transactionId, id1);
 
 			Assert.AreEqual(0, blob[0]);
 
@@ -61,7 +70,7 @@ namespace SomDB.Tests
 
 			transactionId = m_db.StartTransaction();
 
-			blob = m_db.TransactionRead(transactionId, "1");
+			blob = m_db.TransactionGet(transactionId, id1);
 
 			Assert.AreEqual(1, blob[0]);
 
@@ -71,23 +80,25 @@ namespace SomDB.Tests
 		[Test]
 		public void ReadDocumentUpdatedByTransaction()
 		{
-			m_db.Store("1", new byte[1] { 0 });
+			DocumentId id1 = new DocumentId("1");
+
+			m_db.Update(id1, new byte[1] { 0 });
 
 			int transactionId = m_db.StartTransaction();
 
-			m_db.TransactionUpdate(transactionId, "1", new byte[1] { 1 });
+			m_db.TransactionUpdate(transactionId, id1, new byte[1] { 1 });
 
-			byte[] blob = m_db.TransactionRead(transactionId, "1");
+			byte[] blob = m_db.TransactionGet(transactionId, id1);
 			Assert.AreEqual(1, blob[0]);
 
 			// reading without transaction should return uncommitted document
-			blob = m_db.Read("1");
+			blob = m_db.Get(id1);
 			Assert.AreEqual(0, blob[0]);
 
 			m_db.CommitTransaction(transactionId);
 
 			// reading the object agian after the transaction committed making sure we are reading the new committed document
-			blob = m_db.Read("1");
+			blob = m_db.Get(id1);
 			Assert.AreEqual(1, blob[0]);
 		}
 	}
