@@ -21,7 +21,7 @@ namespace SomDB.Server
 				port = Convert.ToInt32(args[1]);
 			}
 
-			KetValueDatabase db = new KetValueDatabase(filename => new DatabaseFileReader(filename), filename=> new DatabaseFileWriter(filename),
+			KeyValueDatabase db = new KeyValueDatabase(filename => new DatabaseFileReader(filename), filename=> new DatabaseFileWriter(filename),
 				filename => new MemoryCacheProvider(filename));
 			db.FileName = databaseFile;
 			db.Start();

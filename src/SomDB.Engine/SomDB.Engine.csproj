@@ -56,7 +56,7 @@
     <Compile Include="IO\DatabaseFileWriter.cs" />
     <Compile Include="IO\IDatabaseReader.cs" />
     <Compile Include="IO\IDatabaseWriter.cs" />
-    <Compile Include="KetValueDatabase.cs" />
+    <Compile Include="KeyValueDatabase.cs" />
     <Compile Include="Domain\Document.cs" />
     <Compile Include="Domain\DocumentRevision.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

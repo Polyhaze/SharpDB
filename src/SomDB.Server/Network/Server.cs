@@ -12,12 +12,12 @@ namespace SomDB.Server.Network
 	public class Server
 	{
 		private readonly NetMQContext m_context;
-		private readonly KetValueDatabase m_db;
+		private readonly KeyValueDatabase m_db;
 		private readonly int m_port;
 		private NetMQSocket m_serverSocket;
 		private Poller m_poller;
 
-		public Server(NetMQContext context, KetValueDatabase db, int port)
+		public Server(NetMQContext context, KeyValueDatabase db, int port)
 		{
 			m_context = context;
 			m_db = db;
