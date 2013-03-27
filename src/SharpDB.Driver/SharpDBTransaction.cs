@@ -12,11 +12,13 @@ namespace SharpDB.Driver
 		public SharpDBTransaction(SharpDBConnection connection, int transactionId)
 		{
 			Connection = connection;
-			
+
+			TransactionId = transactionId;
 			TransactionIdBytes = BitConverter.GetBytes(transactionId);
 		}
 
 		internal byte[] TransactionIdBytes { get; private set; }
+		internal int TransactionId { get; private set; }
 		public SharpDBConnection Connection { get; private set; }
 		
 		public T Get<T>(object documentId)

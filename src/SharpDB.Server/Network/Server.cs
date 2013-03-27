@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Common.Logging;
 using NetMQ;
 using SharpDB.Engine;
 using SharpDB.Engine.Domain;
@@ -13,22 +14,33 @@ namespace SharpDB.Server.Network
 	{
 		private readonly NetMQContext m_context;
 		private readonly KeyValueDatabase m_db;
-		private readonly int m_port;
+		private readonly string[] m_addresses;
 		private NetMQSocket m_serverSocket;
 		private Poller m_poller;
-
-		public Server(NetMQContext context, KeyValueDatabase db, int port)
+		private ILog m_log;
+		
+		public Server(NetMQContext context,  KeyValueDatabase db, params string[] addresses)
 		{
 			m_context = context;
 			m_db = db;
-			m_port = port;
+			m_addresses = addresses;
+			m_log = LogManager.GetLogger(this.GetType());
+
+			if (!m_addresses.Any())
+			{
+				throw new ArgumentException("You must provide at least one address to listen too");
+			}
 		}
 
 		public void Start()
 		{
 			using (m_serverSocket = m_context.CreateResponseSocket())
 			{
-				m_serverSocket.Bind(string.Format("tcp://*:{0}", m_port));
+				foreach (var address in m_addresses)
+				{
+					m_log.InfoFormat("Listening on {0}", address);
+					m_serverSocket.Bind(address);					
+				}
 				m_serverSocket.ReceiveReady += OnMessage;
 
 				m_poller = new Poller();
@@ -36,6 +48,11 @@ namespace SharpDB.Server.Network
 
 				m_poller.Start();
 			}
+		}
+
+		public void Stop()
+		{
+			m_poller.Stop(true);
 		}
 
 		private void OnMessage(object sender, NetMQSocketEventArgs e)
@@ -261,5 +278,7 @@ namespace SharpDB.Server.Network
 
 			m_serverSocket.SendMore(Protocol.Success).Send(blob);
 		}
+
+		
 	}
 }

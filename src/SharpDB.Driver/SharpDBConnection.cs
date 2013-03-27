@@ -6,6 +6,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using Common.Logging;
 using NetMQ;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Bson;
@@ -17,11 +18,13 @@ namespace SharpDB.Driver
 	{
 		private bool m_isDisposed;
 		private SharpDBClient m_client;
-		
+		internal ILog Log { get; private set; }
+
 		private IList<SharpDBTransaction> m_transactions = new List<SharpDBTransaction>();		
 
 		internal SharpDBConnection(SharpDBClient client, NetMQSocket socket, ISerializer serializer)
 		{
+			Log = LogManager.GetLogger(this.GetType());
 			m_client = client;
 			Socket = socket;
 			Serializer = serializer;
@@ -238,10 +241,17 @@ namespace SharpDB.Driver
 			if (result)
 			{
 				int transactionId = BitConverter.ToInt32(Socket.Receive(), 0);
+
+				Log.DebugFormat("Transaction {0} started", transactionId);
+
 				return new SharpDBTransaction(this, transactionId);
 			}
 			else
 			{
+				string error = Socket.ReceiveString();
+
+				Log.ErrorFormat("Failed to start transaction, error: {0}", error);
+
 				throw new SharpDBException(Socket.ReceiveString());
 			}
 		}
@@ -258,7 +268,13 @@ namespace SharpDB.Driver
 			{
 				string error = Socket.ReceiveString();
 
+				Log.ErrorFormat("Failed to commit transaction {0}, error: {1}", transaction.TransactionId, error);
+
 				throw new SharpDBException(error);
+			}
+			else
+			{
+				Log.DebugFormat("Transaction {0} committed", transaction.TransactionId);
 			}
 		}
 
@@ -273,7 +289,13 @@ namespace SharpDB.Driver
 			{
 				string error = Socket.ReceiveString();
 
+				Log.ErrorFormat("Failed to rollback transaction {0}, error: {1}", transaction.TransactionId, error);
+
 				throw new SharpDBException(error);
+			}
+			else
+			{
+				Log.DebugFormat("Transaction {0} rollbacked", transaction.TransactionId);
 			}
 		}
 

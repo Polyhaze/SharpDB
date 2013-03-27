@@ -9,14 +9,16 @@ namespace SharpDB.Engine.Domain
 	{
 		private int m_hash;
 
-		public DocumentId(string id) : this(Encoding.Unicode.GetBytes(id))
+		public DocumentId(string id)
+			: this(Encoding.Unicode.GetBytes(id))
 		{
-			
+
 		}
 
-		public DocumentId(int id) : this(BitConverter.GetBytes(id))
+		public DocumentId(int id)
+			: this(BitConverter.GetBytes(id))
 		{
-			
+
 		}
 
 		public DocumentId(byte[] value)
@@ -29,7 +31,21 @@ namespace SharpDB.Engine.Domain
 		public int Length
 		{
 			get { return Bytes.Length; }
+		}
+
+		public string GetBytesReprestnation()
+		{
+			StringBuilder bytesRepresentation = new StringBuilder();
+
+			for (int i = 0; i < Bytes.Length - 1; i++)
+			{
+				bytesRepresentation.AppendFormat("{0},", (int)Bytes[i]);
 			}
+
+			bytesRepresentation.AppendFormat("{0}", (int) Bytes.Last());
+
+			return bytesRepresentation.ToString();
+		}
 
 		protected bool Equals(DocumentId other)
 		{
@@ -38,16 +54,16 @@ namespace SharpDB.Engine.Domain
 				return false;
 			}
 
-			return Bytes.SequenceEqual(other.Bytes);			
+			return Bytes.SequenceEqual(other.Bytes);
 		}
 
 		public override bool Equals(object obj)
 		{
 			if (ReferenceEquals(null, obj)) return false;
 			if (ReferenceEquals(this, obj)) return true;
-			
+
 			if (obj.GetType() != this.GetType()) return false;
-			return Equals((DocumentId) obj);
+			return Equals((DocumentId)obj);
 		}
 
 		public override int GetHashCode()

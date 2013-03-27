@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Common.Logging;
 using SharpDB.Engine.Domain;
 using SharpDB.Engine.IO;
 using SharpDB.Engine.Cache;
@@ -15,6 +16,7 @@ namespace SharpDB.Engine
 	{
 		private readonly byte[] ZeroBlob = new byte[0];
 
+		private readonly ILog m_log;
 		private readonly Func<string, IDatabaseReader> m_readerFactory;
 		private readonly Func<string, IDatabaseWriter> m_writerFactory;
 		private readonly Func<string, ICacheProvider> m_cacheProviderFactory;
@@ -32,7 +34,9 @@ namespace SharpDB.Engine
 		public KeyValueDatabase(Func<string, IDatabaseReader> readerFactory, 
 			Func<string, IDatabaseWriter> writerFactory, Func<string, ICacheProvider> cacheProviderFactory)
 		{
-			FileName = "default.dbfile";
+			m_log = LogManager.GetLogger(this.GetType());
+
+			FileName = "default.dbfile";			
 			m_readerFactory = readerFactory;
 			m_writerFactory = writerFactory;
 			m_cacheProviderFactory = cacheProviderFactory;
@@ -58,8 +62,19 @@ namespace SharpDB.Engine
 
 		public void Update(DocumentId documentId, byte[] blob)
 		{
-			Document document = m_documentStore.GetDocumentForUpdate(documentId, -1);
-
+			Document document;
+			try
+			{
+				document = m_documentStore.GetDocumentForUpdate(documentId, -1);
+			}
+			catch (DocumentLockedException)
+			{				
+				m_log.InfoFormat("Update failed because document is locked by another transaction, documentId(bytes):{0}", 
+					documentId.GetBytesReprestnation());
+				
+				throw;
+			}
+			
 			DBTimeStamp++;
 
 			m_databaseFileWriter.BeginTimestamp(DBTimeStamp, 1);
@@ -130,6 +145,8 @@ namespace SharpDB.Engine
 
 			m_pendingTransaction.Add(transaction.TransactionId, transaction);
 
+			m_log.DebugFormat("Start transaction {0}", transaction.TransactionId);
+
 			return transaction.TransactionId;
 		}
 
@@ -142,9 +159,20 @@ namespace SharpDB.Engine
 				throw new TransactionNotExistException();
 			}
 
-			// mark the document is updated by transaction
-			m_documentStore.GetDocumentForUpdate(documentId, transactionId);
+			try
+			{
+				// mark the document is updated by transaction
+				m_documentStore.GetDocumentForUpdate(documentId, transactionId);
+			}
+			catch (DocumentLockedException)
+			{
+				m_log.InfoFormat("Tranasction {1} update failed because document is locked by another transaction, documentId(bytes):{0}",
+					documentId.GetBytesReprestnation(), transactionId);
 
+				throw;
+			}
+
+			
 			transaction.AddUpdate(documentId, blob);
 		}
 
@@ -202,6 +230,9 @@ namespace SharpDB.Engine
 			}
 
 			m_pendingTransaction.Remove(transactionId);
+
+
+			m_log.DebugFormat("Transaction {0} rollbacked", transaction.TransactionId);
 		}
 
 		public void CommitTransaction(int transactionId)
@@ -251,6 +282,9 @@ namespace SharpDB.Engine
 			}
 
 			m_pendingTransaction.Remove(transactionId);
+
+			m_log.DebugFormat("Transaction {0} committed", transaction.TransactionId);
+
 		}
 
 		public void Cleanup()
