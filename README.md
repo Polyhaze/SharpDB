@@ -22,5 +22,5 @@ If you will send some good pull request you will commit permission to the reposi
 
 ## Who owns SharpDB?
 
-NetMQ is owned by all its authors and contributors. 
+SharpDB is owned by all its authors and contributors. 
 This is an open source project licensed under the LGPLv3.
