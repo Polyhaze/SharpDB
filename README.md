@@ -24,7 +24,36 @@ You can also run the database as a service with the following commands (must run
   
 ## Using
 
+To use SharpDB from your application include the SharpDB.Driver assembly. 
+Following is small example of using the SharpDB driver:
 
+		[Test]
+		public void UpdateGet()
+		{
+			using (SharpDBClient client = new SharpDBClient("tcp://127.0.0.1:5555"))
+			{
+				using (SharpDBConnection connection = client.GetConnection())
+				{
+					Account newAccount = new Account();
+					newAccount.Name = "Hello";
+					newAccount.Id = 1;
+
+					connection.Update(newAccount);
+
+					Account storedAccount = connection.Get<Account>(1);
+
+					Assert.AreEqual("Hello", storedAccount.Name);
+				}
+			}
+		}
+		
+and the account class:
+	public class Account
+	{
+		public int Id { get; set; }
+
+		public string Name { get; set; }
+	}
 
 ## Contributing
 
