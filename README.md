@@ -19,8 +19,8 @@ You can change the name and port fields as you like. File called name.sdb will b
 
 You can also run the database as a service with the following commands (must run as administrator)
   
-  SharpDB.Server.exe install -name:test -port:5555
-  SharpDB.Server.exe start
+ SharpDB.Server.exe install -name:test -port:5555
+	SharpDB.Server.exe start
   
 ## Using
 
