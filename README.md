@@ -11,6 +11,14 @@ For network protocl SharpDB is using [NetMQ](https://github.com/zeromq/netmq) wh
 
 Packages of SharpDB is still not available, so download the code code and compile.
 
+After compiling run the following command to run the server:
+  SharpDB.Server.exe run -name:test -port:5555
+
+You can change the name and port fields as you like. File called name.sdb will be created as the database file.
+You can also run the database as a service with the following commands (must run as administrator)
+  SharpDB.Server.exe install -name:test -port:5555
+  SharpDB.Server.exe start
+  
 ## Using
 
 
