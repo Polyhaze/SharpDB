@@ -48,12 +48,14 @@ Following is small example of using the SharpDB driver:
 		}
 		
 and the account class:
+	
 	public class Account
 	{
 		public int Id { get; set; }
 
 		public string Name { get; set; }
 	}
+	
 
 ## Contributing
 
