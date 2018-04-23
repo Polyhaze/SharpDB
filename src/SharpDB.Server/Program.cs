@@ -1,16 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.ServiceProcess;
-using System.Text;
-using Microsoft.Win32;
-using SharpDB.Engine;
-using SharpDB.Engine.IO;
-using SharpDB.Engine.Cache;
 using Topshelf;
-using NetMQ;
-using Topshelf.Hosts;
-using Common.Logging;
 
 namespace SharpDB.Server
 {

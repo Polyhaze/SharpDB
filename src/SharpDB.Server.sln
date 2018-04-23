@@ -11,8 +11,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharpDB.Engine", "SharpDB.E
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharpDB.Driver", "SharpDB.Driver\SharpDB.Driver.csproj", "{5C55E790-79A4-491F-801E-502ED19D0FBE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpDB.Engine.Specs", "SharpDB.Engine.Specs\SharpDB.Engine.Specs.csproj", "{93F474C3-4C19-4E87-8BA8-36EBDB4CBF06}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpDB.Engine.Tests", "SharpDB.Engine.Tests\SharpDB.Engine.Tests.csproj", "{4AFC56FA-8F1E-414D-954C-C3A4604800A7}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharpDB.Example", "SharpDB.Example\SharpDB.Example.csproj", "{473F1737-D746-4347-92F6-D0C76A7464CC}"
@@ -39,10 +37,6 @@ Global
 		{5C55E790-79A4-491F-801E-502ED19D0FBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5C55E790-79A4-491F-801E-502ED19D0FBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5C55E790-79A4-491F-801E-502ED19D0FBE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{93F474C3-4C19-4E87-8BA8-36EBDB4CBF06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{93F474C3-4C19-4E87-8BA8-36EBDB4CBF06}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{93F474C3-4C19-4E87-8BA8-36EBDB4CBF06}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{93F474C3-4C19-4E87-8BA8-36EBDB4CBF06}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4AFC56FA-8F1E-414D-954C-C3A4604800A7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4AFC56FA-8F1E-414D-954C-C3A4604800A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4AFC56FA-8F1E-414D-954C-C3A4604800A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
