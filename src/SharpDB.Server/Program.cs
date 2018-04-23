@@ -13,46 +13,50 @@ using Topshelf.Hosts;
 
 namespace SharpDB.Server
 {
-	class Program
-	{
-		static void Main(string[] args)
-		{
-			HostFactory.Run(c =>
-				{
-					string databaseFile = "default";
-					int port = 5999;
+    internal class Program
+    {
+        private static int Main(string[] args)
+        {
+            string databaseFile = "default";
+            int port = 5999;
 
-					c.AddCommandLineDefinition("name", f => databaseFile = f);
-					c.AddCommandLineDefinition("port", p => port = Convert.ToInt32(p));
+            return (int)HostFactory.Run(x =>
+                   {
+                       x.UseAssemblyInfoForServiceInfo();
+                       x.Service(settings => new ServerService(databaseFile, port), s =>
+{
+    s.BeforeStartingService(_ => Console.WriteLine("BeforeStart"));
+    s.BeforeStoppingService(_ => Console.WriteLine("BeforeStop"));
+});
 
-					c.Service<ServerService>(x =>
-						{
-							x.ConstructUsing(name => new ServerService(databaseFile, port));
-							x.WhenStarted(dbService => dbService.Start());
-							x.WhenStopped(dbService => dbService.Stop());
-						}).RunAsLocalService();
+                       x.SetStartTimeout(TimeSpan.FromSeconds(10));
+                       x.SetStopTimeout(TimeSpan.FromSeconds(10));
 
-					c.AfterInstall(h =>
-						{
-							string arguments = string.Format("-name:{0} -port:{1}", databaseFile, port);
-							AddArgumentsToPath(h.ServiceName, arguments);
-						});
-				});			
-		}
+                       x.AddCommandLineDefinition("name", f => databaseFile = f);
+                       x.AddCommandLineDefinition("port", p => port = Convert.ToInt32(p));
 
-		private static void AddArgumentsToPath(string serviceName, string parameters)
-		{
-			string registryPath = @"SYSTEM\CurrentControlSet\Services\" + serviceName;
-			RegistryKey keyHKLM = Registry.LocalMachine;
+                       x.OnException((exception) =>
+               {
+                   Console.WriteLine("Exception thrown - " + exception.Message);
+               });
+                   });
+        }
 
-			RegistryKey key = keyHKLM.OpenSubKey(registryPath, true);
+        private static void AddArgumentsToPath(string serviceName, string parameters)
+        {
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                string registryPath = @"SYSTEM\CurrentControlSet\Services\" + serviceName;
+                RegistryKey keyHKLM = Registry.LocalMachine;
 
-			string value = key.GetValue("ImagePath").ToString();
+                RegistryKey key = keyHKLM.OpenSubKey(registryPath, true);
 
-			key.SetValue("ImagePath", value + " " + parameters);
+                string value = key.GetValue("ImagePath").ToString();
 
-			key.Close();
-		}
+                key.SetValue("ImagePath", value + " " + parameters);
 
-	}
+                key.Close();
+            }
+        }
+    }
 }
