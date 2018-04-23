@@ -55,14 +55,4 @@ and the account class:
 
 		public string Name { get; set; }
 	}
-	
 
-## Contributing
-
-I really appricate help with the project, just click the fork button, pick an issue from the issues (or add your own issue) and create a pull request.
-If you will send some good pull request you will commit permission to the repository.
-
-## Who owns SharpDB?
-
-SharpDB is owned by all its authors and contributors. 
-This is an open source project licensed under the LGPLv3.
