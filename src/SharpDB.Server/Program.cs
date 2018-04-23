@@ -10,6 +10,7 @@ using SharpDB.Engine.Cache;
 using Topshelf;
 using NetMQ;
 using Topshelf.Hosts;
+using Common.Logging;
 
 namespace SharpDB.Server
 {
@@ -19,10 +20,10 @@ namespace SharpDB.Server
         {
             string databaseFile = "default";
             int port = 5999;
-
             return (int)HostFactory.Run(x =>
                    {
                        x.UseAssemblyInfoForServiceInfo();
+
                        x.Service(settings => new ServerService(databaseFile, port), s =>
 {
     s.BeforeStartingService(_ => Console.WriteLine("BeforeStart"));
@@ -40,23 +41,6 @@ namespace SharpDB.Server
                    Console.WriteLine("Exception thrown - " + exception.Message);
                });
                    });
-        }
-
-        private static void AddArgumentsToPath(string serviceName, string parameters)
-        {
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-            {
-                string registryPath = @"SYSTEM\CurrentControlSet\Services\" + serviceName;
-                RegistryKey keyHKLM = Registry.LocalMachine;
-
-                RegistryKey key = keyHKLM.OpenSubKey(registryPath, true);
-
-                string value = key.GetValue("ImagePath").ToString();
-
-                key.SetValue("ImagePath", value + " " + parameters);
-
-                key.Close();
-            }
         }
     }
 }
