@@ -10,275 +10,276 @@ using SharpDB.Shared;
 
 namespace SharpDB.Server.Network
 {
-	public class Server
-	{
-		private readonly NetMQContext m_context;
-		private readonly KeyValueDatabase m_db;
-		private readonly string[] m_addresses;
-		private NetMQSocket m_serverSocket;
-		private Poller m_poller;
-		private ILog m_log;
-		
-		public Server(NetMQContext context,  KeyValueDatabase db, params string[] addresses)
-		{
-			m_context = context;
-			m_db = db;
-			m_addresses = addresses;
-			m_log = LogManager.GetLogger(this.GetType());
+    public class Server
+    {
+        private readonly KeyValueDatabase m_db;
+        private readonly string[] m_addresses;
+        private NetMQSocket m_serverSocket;
+        private NetMQPoller m_poller;
+        private ILog m_log;
 
-			if (!m_addresses.Any())
-			{
-				throw new ArgumentException("You must provide at least one address to listen too");
-			}
-		}
+        public Server(KeyValueDatabase db, params string[] addresses)
+        {
+            m_db = db;
+            m_addresses = addresses;
+            m_log = LogManager.GetLogger(this.GetType());
 
-		public void Start()
-		{
-			using (m_serverSocket = m_context.CreateResponseSocket())
-			{
-				foreach (var address in m_addresses)
-				{
-					m_log.InfoFormat("Listening on {0}", address);
-					m_serverSocket.Bind(address);					
-				}
-				m_serverSocket.ReceiveReady += OnMessage;
+            if (!m_addresses.Any())
+            {
+                throw new ArgumentException("You must provide at least one address to listen too");
+            }
+        }
 
-				m_poller = new Poller();
-				m_poller.AddSocket(m_serverSocket);
+        public void Start()
+        {
+            using (m_serverSocket = new NetMQ.Sockets.ResponseSocket())
+            {
+                foreach (var address in m_addresses)
+                {
+                    m_log.InfoFormat("Listening on {0}", address);
+                    m_serverSocket.Bind(address);
+                }
+                m_serverSocket.ReceiveReady += OnMessage;
 
-				m_poller.Start();
-			}
-		}
+                m_poller = new NetMQPoller();
+                m_poller.Add(m_serverSocket);
 
-		public void Stop()
-		{
-			m_poller.Stop(true);
-		}
+                m_poller.Run();
+            }
+        }
 
-		private void OnMessage(object sender, NetMQSocketEventArgs e)
-		{
-			byte[] messageTypeBytes = m_serverSocket.Receive();
+        public void Stop()
+        {
+            m_poller.Stop();
+        }
 
-			MessageType messageType = (MessageType) messageTypeBytes[0];
+        private void OnMessage(object sender, NetMQSocketEventArgs e)
+        {
+            byte[] messageTypeBytes = m_serverSocket.ReceiveFrameBytes();
 
-			switch (messageType)
-			{
-				case MessageType.Get:
-					Get();
-					break;
-				case MessageType.Update:
-					Update();
-					break;
-				case MessageType.Delete:
-					Delete();
-					break;					
-				case MessageType.StartTransaction:
-					StartTransaction();
-					break;
-				case MessageType.Commit:
-					Commit();
-					break;
-				case MessageType.Rollback:
-					Rollback();
-					break;
-				case MessageType.TransactionGet:
-					TransactionGet();					
-					break;
-				case MessageType.TransactionUpdate:
-					TransactionUpdate();
-					break;
-				case MessageType.TransactionDelete:
-					TransactionDelete();
-					break;					
-				default:
-					throw new ArgumentOutOfRangeException();
-			}
-		}
+            MessageType messageType = (MessageType)messageTypeBytes[0];
 
-		
-		private void TransactionDelete()
-		{
-			byte[] transactionIdBytes = m_serverSocket.Receive();
+            switch (messageType)
+            {
+                case MessageType.Get:
+                    Get();
+                    break;
 
-			int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
+                case MessageType.Update:
+                    Update();
+                    break;
 
-			byte[] documentIdBytes = m_serverSocket.Receive();
+                case MessageType.Delete:
+                    Delete();
+                    break;
 
-			DocumentId documentId = new DocumentId(documentIdBytes);
-			
-			try
-			{
-				m_db.TransactionDelete(transactionId, documentId);
+                case MessageType.StartTransaction:
+                    StartTransaction();
+                    break;
 
-				// sending success
-				m_serverSocket.Send(Protocol.Success);
-			}
-			catch (TransactionNotExistException ex)
-			{
-				m_serverSocket.SendMore(Protocol.Failed).Send("Transaction doesn't exist");
-			}
-			catch (DocumentLockedException)
-			{
-				m_serverSocket.SendMore(Protocol.Failed).Send("Document locked by another transaction");
-			}
-		}
+                case MessageType.Commit:
+                    Commit();
+                    break;
 
+                case MessageType.Rollback:
+                    Rollback();
+                    break;
 
-		private void TransactionUpdate()
-		{
-			byte[] transactionIdBytes = m_serverSocket.Receive();
+                case MessageType.TransactionGet:
+                    TransactionGet();
+                    break;
 
-			int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
+                case MessageType.TransactionUpdate:
+                    TransactionUpdate();
+                    break;
 
-			byte[] documentIdBytes = m_serverSocket.Receive();
+                case MessageType.TransactionDelete:
+                    TransactionDelete();
+                    break;
 
-			DocumentId documentId = new DocumentId(documentIdBytes);
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
 
-			byte[] blob = m_serverSocket.Receive();
+        private void TransactionDelete()
+        {
+            byte[] transactionIdBytes = m_serverSocket.ReceiveFrameBytes();
 
-			try
-			{
-				m_db.TransactionUpdate(transactionId, documentId, blob);
+            int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
 
-				// sending success
-				m_serverSocket.Send(Protocol.Success);			
-			}
-			catch (TransactionNotExistException ex)
-			{
-				m_serverSocket.SendMore(Protocol.Failed).Send("Transaction doesn't exist");
-			}
-			catch (DocumentLockedException)
-			{
-				m_serverSocket.SendMore(Protocol.Failed).Send("Document locked by another transaction");
-			}					
-		}
+            byte[] documentIdBytes = m_serverSocket.ReceiveFrameBytes();
 
-		private void TransactionGet()
-		{
-			byte[] transactionIdBytes = m_serverSocket.Receive();
+            DocumentId documentId = new DocumentId(documentIdBytes);
 
-			int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
+            try
+            {
+                m_db.TransactionDelete(transactionId, documentId);
 
-			byte[] documentIdBytes = m_serverSocket.Receive();
+                // sending success
+                m_serverSocket.SendFrame(Protocol.Success);
+            }
+            catch (TransactionNotExistException ex)
+            {
+                m_serverSocket.SendMoreFrame(Protocol.Failed).SendFrame("Transaction doesn't exist");
+            }
+            catch (DocumentLockedException)
+            {
+                m_serverSocket.SendMoreFrame(Protocol.Failed).SendFrame("Document locked by another transaction");
+            }
+        }
 
-			DocumentId documentId = new DocumentId(documentIdBytes);
+        private void TransactionUpdate()
+        {
+            byte[] transactionIdBytes = m_serverSocket.ReceiveFrameBytes();
 
-			try
-			{
-				byte [] blob = m_db.TransactionGet(transactionId, documentId);
+            int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
 
-				if (blob == null)
-				{
-					blob = new byte[0];
-				}
+            byte[] documentIdBytes = m_serverSocket.ReceiveFrameBytes();
 
-				m_serverSocket.SendMore(Protocol.Success).Send(blob);
-			}
-			catch (TransactionNotExistException ex)
-			{
-				m_serverSocket.SendMore(Protocol.Failed).Send("Transaction doesn't exist");
-			}
-		}
+            DocumentId documentId = new DocumentId(documentIdBytes);
 
-		private void Rollback()
-		{
-			byte[] transactionIdBytes = m_serverSocket.Receive();
+            byte[] blob = m_serverSocket.ReceiveFrameBytes();
 
-			int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
+            try
+            {
+                m_db.TransactionUpdate(transactionId, documentId, blob);
 
-			try
-			{
-				m_db.RollbackTransaction(transactionId);
-				m_serverSocket.Send(Protocol.Success);
-			}
-			catch (TransactionNotExistException ex)
-			{
-				m_serverSocket.SendMore(Protocol.Failed).Send("Transaction doesn't exist");
-			}
-		}
+                // sending success
+                m_serverSocket.SendFrame(Protocol.Success);
+            }
+            catch (TransactionNotExistException ex)
+            {
+                m_serverSocket.SendMoreFrame(Protocol.Failed).SendFrame("Transaction doesn't exist");
+            }
+            catch (DocumentLockedException)
+            {
+                m_serverSocket.SendMoreFrame(Protocol.Failed).SendFrame("Document locked by another transaction");
+            }
+        }
 
-		private void Commit()
-		{
-			byte[] transactionIdBytes = m_serverSocket.Receive();
+        private void TransactionGet()
+        {
+            byte[] transactionIdBytes = m_serverSocket.ReceiveFrameBytes();
 
-			int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
+            int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
 
-			try
-			{
-				m_db.CommitTransaction(transactionId);
-				m_serverSocket.Send(Protocol.Success);
-			}
-			catch (TransactionNotExistException ex)
-			{
-				m_serverSocket.SendMore(Protocol.Failed).Send("Transaction doesn't exist");				
-			}			
-		}
+            byte[] documentIdBytes = m_serverSocket.ReceiveFrameBytes();
 
-		private void StartTransaction()
-		{
-			int transactionId = m_db.StartTransaction();
+            DocumentId documentId = new DocumentId(documentIdBytes);
 
-			m_serverSocket.SendMore(Protocol.Success).Send(BitConverter.GetBytes(transactionId));
-		}
+            try
+            {
+                byte[] blob = m_db.TransactionGet(transactionId, documentId);
 
-		private void Update()
-		{
-			byte[] documentIdBytes = m_serverSocket.Receive();
+                if (blob == null)
+                {
+                    blob = new byte[0];
+                }
 
-			DocumentId documentId = new DocumentId(documentIdBytes);
+                m_serverSocket.SendMoreFrame(Protocol.Success).SendFrame(blob);
+            }
+            catch (TransactionNotExistException ex)
+            {
+                m_serverSocket.SendMoreFrame(Protocol.Failed).SendFrame("Transaction doesn't exist");
+            }
+        }
 
-			byte[] blob = m_serverSocket.Receive();
+        private void Rollback()
+        {
+            byte[] transactionIdBytes = m_serverSocket.ReceiveFrameBytes();
 
-			try
-			{
-				m_db.Update(documentId, blob);
+            int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
 
-				// sending success
-				m_serverSocket.Send(Protocol.Success);
-			}
-			catch (DocumentLockedException)
-			{
-				m_serverSocket.SendMore(Protocol.Failed).Send("Document locked by another transaction");				
-			}			
-		}
+            try
+            {
+                m_db.RollbackTransaction(transactionId);
+                m_serverSocket.SendFrame(Protocol.Success);
+            }
+            catch (TransactionNotExistException ex)
+            {
+                m_serverSocket.SendMoreFrame(Protocol.Failed).SendFrame("Transaction doesn't exist");
+            }
+        }
 
+        private void Commit()
+        {
+            byte[] transactionIdBytes = m_serverSocket.ReceiveFrameBytes();
 
-		private void Delete()
-		{
-			byte[] documentIdBytes = m_serverSocket.Receive();
+            int transactionId = BitConverter.ToInt32(transactionIdBytes, 0);
 
-			DocumentId documentId = new DocumentId(documentIdBytes);
-			
-			try
-			{
-				m_db.Delete(documentId);
+            try
+            {
+                m_db.CommitTransaction(transactionId);
+                m_serverSocket.SendFrame(Protocol.Success);
+            }
+            catch (TransactionNotExistException ex)
+            {
+                m_serverSocket.SendMoreFrame(Protocol.Failed).SendFrame("Transaction doesn't exist");
+            }
+        }
 
-				// sending success
-				m_serverSocket.Send(Protocol.Success);
-			}
-			catch (DocumentLockedException)
-			{
-				m_serverSocket.SendMore(Protocol.Failed).Send("Document locked by another transaction");
-			}
-		}
+        private void StartTransaction()
+        {
+            int transactionId = m_db.StartTransaction();
 
+            m_serverSocket.SendMoreFrame(Protocol.Success).SendFrame(BitConverter.GetBytes(transactionId));
+        }
 
-		private void Get()
-		{
-			byte[] documentIdBytes = m_serverSocket.Receive();
+        private void Update()
+        {
+            byte[] documentIdBytes = m_serverSocket.ReceiveFrameBytes();
 
-			DocumentId documentId = new DocumentId(documentIdBytes);
+            DocumentId documentId = new DocumentId(documentIdBytes);
 
-			byte[] blob = m_db.Get(documentId);
+            byte[] blob = m_serverSocket.ReceiveFrameBytes();
 
-			if (blob == null)
-			{
-				blob = new byte[0];
-			}
+            try
+            {
+                m_db.Update(documentId, blob);
 
-			m_serverSocket.SendMore(Protocol.Success).Send(blob);
-		}
+                // sending success
+                m_serverSocket.SendFrame(Protocol.Success);
+            }
+            catch (DocumentLockedException)
+            {
+                m_serverSocket.SendMoreFrame(Protocol.Failed).SendFrame("Document locked by another transaction");
+            }
+        }
 
-		
-	}
+        private void Delete()
+        {
+            byte[] documentIdBytes = m_serverSocket.ReceiveFrameBytes();
+
+            DocumentId documentId = new DocumentId(documentIdBytes);
+
+            try
+            {
+                m_db.Delete(documentId);
+
+                // sending success
+                m_serverSocket.SendFrame(Protocol.Success);
+            }
+            catch (DocumentLockedException)
+            {
+                m_serverSocket.SendMoreFrame(Protocol.Failed).SendFrame("Document locked by another transaction");
+            }
+        }
+
+        private void Get()
+        {
+            byte[] documentIdBytes = m_serverSocket.ReceiveFrameBytes();
+
+            DocumentId documentId = new DocumentId(documentIdBytes);
+
+            byte[] blob = m_db.Get(documentId);
+
+            if (blob == null)
+            {
+                blob = new byte[0];
+            }
+
+            m_serverSocket.SendMoreFrame(Protocol.Success).SendFrame(blob);
+        }
+    }
 }
